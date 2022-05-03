@@ -24,6 +24,7 @@ class A2C_ACKTR():
 
         self.max_grad_norm = max_grad_norm
 
+        # 如果设置了acktr，优化器会不一样
         if acktr:
             self.optimizer = KFACOptimizer(actor_critic)
         else:

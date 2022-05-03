@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from a2c_ppo_acktr.utils import AddBias, init
+from einops import rearrange
 
 """
 Modify standard PyTorch distributions so they are compatible with this code.
@@ -70,6 +71,25 @@ class Categorical(nn.Module):
 
     def forward(self, x):
         x = self.linear(x)
+        return FixedCategorical(logits=x)
+
+class MultiCategorical(nn.Module):
+    def __init__(self, num_inputs, num_outputs, num_outputs2):
+        super(MultiCategorical, self).__init__()
+
+        init_ = lambda m: init(
+            m,
+            nn.init.orthogonal_,
+            lambda x: nn.init.constant_(x, 0),
+            gain=0.01)
+
+        self.linear = init_(nn.Linear(num_inputs, num_outputs*num_outputs2))
+        self.num_outputs = num_outputs
+        self.num_outputs2 = num_outputs2
+    
+    def forward(self, x):
+        x = self.linear(x)
+        x = rearrange(x, 'b (p n) -> b p n',p=self.num_outputs)
         return FixedCategorical(logits=x)
 
 

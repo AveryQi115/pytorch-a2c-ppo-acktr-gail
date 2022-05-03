@@ -38,6 +38,7 @@ def main():
     torch.set_num_threads(1)
     device = torch.device("cuda:0" if args.cuda else "cpu")
 
+    # import pdb;pdb.set_trace()
     envs = make_vec_envs(args.env_name, args.seed, args.num_processes,
                          args.gamma, args.log_dir, device, False)
 
@@ -49,9 +50,9 @@ def main():
 
     if args.algo == 'a2c':
         agent = algo.A2C_ACKTR(
-            actor_critic,
-            args.value_loss_coef,
-            args.entropy_coef,
+            actor_critic,           # 策略模型
+            args.value_loss_coef,   
+            args.entropy_coef,      
             lr=args.lr,
             eps=args.eps,
             alpha=args.alpha,
@@ -165,10 +166,11 @@ def main():
         if (j % args.save_interval == 0
                 or j == num_updates - 1) and args.save_dir != "":
             save_path = os.path.join(args.save_dir, args.algo)
+            print(save_path)
             try:
                 os.makedirs(save_path)
             except OSError:
-                pass
+                print(f"make dir error: {save_path}")
 
             torch.save([
                 actor_critic,
@@ -189,9 +191,9 @@ def main():
 
         if (args.eval_interval is not None and len(episode_rewards) > 1
                 and j % args.eval_interval == 0):
-            obs_rms = utils.get_vec_normalize(envs).obs_rms
-            evaluate(actor_critic, obs_rms, args.env_name, args.seed,
-                     args.num_processes, eval_log_dir, device)
+            # obs_rms = utils.get_vec_normalize(envs).obs_rms
+            evaluate(actor_critic, None, args.env_name, args.seed,
+                     1, eval_log_dir, device)
 
 
 if __name__ == "__main__":

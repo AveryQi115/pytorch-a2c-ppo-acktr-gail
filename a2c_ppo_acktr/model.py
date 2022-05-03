@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from a2c_ppo_acktr.distributions import Bernoulli, Categorical, DiagGaussian
+from a2c_ppo_acktr.distributions import Bernoulli, Categorical, DiagGaussian, MultiCategorical
 from a2c_ppo_acktr.utils import init
 
 
@@ -36,6 +36,11 @@ class Policy(nn.Module):
         elif action_space.__class__.__name__ == "MultiBinary":
             num_outputs = action_space.shape[0]
             self.dist = Bernoulli(self.base.output_size, num_outputs)
+        elif action_space.__class__.__name__ == "MultiDiscrete":
+            num_outputs = action_space.shape[0]
+            num_outputs2 = action_space[0].n
+            self.dist = MultiCategorical(self.base.output_size,num_outputs,num_outputs2)
+            self.need_squeeze = True
         else:
             raise NotImplementedError
 
@@ -60,6 +65,9 @@ class Policy(nn.Module):
         else:
             action = dist.sample()
 
+        if self.need_squeeze:
+            action = action.squeeze()
+
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
 
@@ -70,6 +78,7 @@ class Policy(nn.Module):
         return value
 
     def evaluate_actions(self, inputs, rnn_hxs, masks, action):
+        # import pdb;pdb.set_trace()
         value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
         dist = self.dist(actor_features)
 
@@ -174,10 +183,10 @@ class CNNBase(NNBase):
                                constant_(x, 0), nn.init.calculate_gain('relu'))
 
         self.main = nn.Sequential(
-            init_(nn.Conv2d(num_inputs, 32, 8, stride=4)), nn.ReLU(),
-            init_(nn.Conv2d(32, 64, 4, stride=2)), nn.ReLU(),
-            init_(nn.Conv2d(64, 32, 3, stride=1)), nn.ReLU(), Flatten(),
-            init_(nn.Linear(32 * 7 * 7, hidden_size)), nn.ReLU())
+            init_(nn.Conv2d(num_inputs, 32, 2, stride=1)), nn.ReLU(),
+            init_(nn.Conv2d(32, 64, 2, stride=1)), nn.ReLU(),
+            init_(nn.Conv2d(64, 32, 1, stride=1)), nn.ReLU(), Flatten(),
+            init_(nn.Linear(2304, hidden_size)), nn.ReLU())
 
         init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.
                                constant_(x, 0))
@@ -187,7 +196,7 @@ class CNNBase(NNBase):
         self.train()
 
     def forward(self, inputs, rnn_hxs, masks):
-        x = self.main(inputs / 255.0)
+        x = self.main(inputs)# TODO: remove divide 255
 
         if self.is_recurrent:
             x, rnn_hxs = self._forward_gru(x, rnn_hxs, masks)
